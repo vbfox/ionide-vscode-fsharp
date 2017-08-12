@@ -134,7 +134,6 @@ module SolutionExplorer =
                 name
         | ProjectReference (_, name, _) -> name
 
-
     let private createProvider (emiter : EventEmitter<Model>) : TreeDataProvider<Model> =
 
 
@@ -254,6 +253,14 @@ module SolutionExplorer =
             match unbox m with
             | ProjectReference (path, _, p) ->
                 Forge.removeProjectReferencePath path p
+                |> unbox
+            | _ -> unbox ()
+        )) |> ignore
+
+        commands.registerCommand("fsharp.explorer.openProjectFile", Func<obj, obj>(fun m ->
+            match unbox m with
+            | Project (path, _, _, _, _) ->
+                commands.executeCommand("vscode.open", Uri.file(path))
                 |> unbox
             | _ -> unbox ()
         )) |> ignore
