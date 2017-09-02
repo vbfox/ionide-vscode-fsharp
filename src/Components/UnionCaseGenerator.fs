@@ -54,7 +54,6 @@ module UnionCaseGenerator =
 
     let activate selector (context: ExtensionContext) =
         languages.registerCodeActionsProvider (selector, createProvider()) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.insertUnionCases",Func<obj,obj,obj,obj>(fun a b c -> insertText(a |> unbox, b |> unbox, c |> unbox) |> unbox )) |> context.subscriptions.Add
-
+        context |> Commands.register "fsharp.insertUnionCases" insertText
 
         ()

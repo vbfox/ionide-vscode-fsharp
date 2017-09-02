@@ -385,17 +385,13 @@ module Expecto =
         watcherEnabled <- false
 
     let activate (context: ExtensionContext) =
-        let registerCommand com (f: unit-> _) =
-            vscode.commands.registerCommand(com, unbox<Func<obj,obj>> f)
-            |> context.subscriptions.Add
-
-        registerCommand "Expecto.run" (fun _ -> runAll false)
-        registerCommand "Expecto.runSingle" runSingle
-        registerCommand "Expecto.runList" runList
-        registerCommand "Expecto.runFailed" runFailed
-        registerCommand "Expecto.startWatchMode" startWatchMode
-        registerCommand "Expecto.stopWatchMode" stopWatchMode
-        registerCommand "Expecto.watchMode" (fun _ -> outputChannel.show () )
+        context |> Commands.register "Expecto.run" (fun _ -> runAll false)
+        context |> Commands.register "Expecto.runSingle" runSingle
+        context |> Commands.register "Expecto.runList" runList
+        context |> Commands.register "Expecto.runFailed" runFailed
+        context |> Commands.register "Expecto.startWatchMode" startWatchMode
+        context |> Commands.register "Expecto.stopWatchMode" stopWatchMode
+        context |> Commands.register "Expecto.watchMode" (fun _ -> outputChannel.show () )
 
         statusBar.text <- "$(eye) Watch Mode Off"
         statusBar.tooltip <- "Expecto continuous testing"

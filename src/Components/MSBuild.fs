@@ -210,14 +210,11 @@ module MSBuild =
         invokeMSBuild project.Project target (Some host)
 
     let activate (context: ExtensionContext) =
-        let registerCommand com (action : unit -> _) = vscode.commands.registerCommand(com, unbox<Func<obj, obj>> action) |> context.subscriptions.Add
-        let registerCommand2 com (action : obj -> obj -> _) = vscode.commands.registerCommand(com, Func<obj, obj, obj>(fun a b -> action a b |> unbox)) |> context.subscriptions.Add
-
         /// typed msbuild cmd. Optional project and msbuild host
-        let typedMsbuildCmd f projOpt hostOpt =
-            let p = if JS.isDefined projOpt then Some (unbox<string>(projOpt)) else None
+        let typedMsbuildCmd f (projOpt: string) (hostOpt: int) =
+            let p = if JS.isDefined projOpt then Some projOpt else None
             let h =
-                match (if JS.isDefined hostOpt then unbox<int>(hostOpt) else 0) with
+                match (if JS.isDefined hostOpt then hostOpt else 0) with
                 | 1 -> Some MSbuildHost.MSBuildExe
                 | 2 -> Some MSbuildHost.DotnetCli
                 | 0 | _ -> None
@@ -258,13 +255,13 @@ module MSBuild =
         |> Event.invoke reloadCfg
         |> context.subscriptions.Add
 
-        registerCommand "MSBuild.buildCurrent" (fun _ -> buildCurrentProject "Build")
-        registerCommand "MSBuild.rebuildCurrent" (fun _ -> buildCurrentProject "Rebuild")
-        registerCommand "MSBuild.cleanCurrent" (fun _ -> buildCurrentProject "Clean")
+        context |> Commands.register "MSBuild.buildCurrent" (fun () -> buildCurrentProject "Build")
+        context |> Commands.register "MSBuild.rebuildCurrent" (fun () -> buildCurrentProject "Rebuild")
+        context |> Commands.register "MSBuild.cleanCurrent" (fun () -> buildCurrentProject "Clean")
 
-        registerCommand2 "MSBuild.buildSelected" (typedMsbuildCmd (buildProject "Build"))
-        registerCommand2 "MSBuild.rebuildSelected" (typedMsbuildCmd (buildProject "Rebuild"))
-        registerCommand2 "MSBuild.cleanSelected" (typedMsbuildCmd (buildProject "Clean"))
-        registerCommand2 "MSBuild.restoreSelected" (typedMsbuildCmd (buildProject"Restore"))
+        context |> Commands.register "MSBuild.buildSelected" (typedMsbuildCmd (buildProject "Build"))
+        context |> Commands.register "MSBuild.rebuildSelected" (typedMsbuildCmd (buildProject "Rebuild"))
+        context |> Commands.register "MSBuild.cleanSelected" (typedMsbuildCmd (buildProject "Clean"))
+        context |> Commands.register "MSBuild.restoreSelected" (typedMsbuildCmd (buildProject"Restore"))
 
-        registerCommand "MSBuild.switchMSbuildHostType" (fun _ -> switchMSbuildHostType ())
+        context |> Commands.register "MSBuild.switchMSbuildHostType" switchMSbuildHostType

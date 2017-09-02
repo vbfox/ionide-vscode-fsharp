@@ -143,14 +143,12 @@ module Forge =
     let refreshTemplates () =
         "refresh" |> spawnForge |> ignore
 
-    let addCurrentFileToProject () =
-        let editor = vscode.window.activeTextEditor
+    let addCurrentFileToProject (editor: TextEditor) _ =
         match editor.document with
         | Document.FSharp -> sprintf "add file -n %s" editor.document.fileName |> spawnForge |> ignore
         | _ -> ()
 
-    let removeCurrentFileFromProject () =
-        let editor = vscode.window.activeTextEditor
+    let removeCurrentFileFromProject (editor: TextEditor) _ =
         match editor.document with
         | Document.FSharp -> sprintf "remove file -n %s" editor.document.fileName |> spawnForge |> ignore
         | _ -> ()
@@ -321,18 +319,18 @@ module Forge =
 
         watcher.onDidCreate $ (onFsFileCreateHandler, null, context.subscriptions) |> ignore
         watcher.onDidDelete $ (onFsFileRemovedHandler, null, context.subscriptions) |> ignore
-        commands.registerCommand("fsharp.MoveFileUp", moveFileUp |> unbox<Func<obj,obj>> ) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.MoveFileDown", moveFileDown |> unbox<Func<obj,obj>>) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.NewProject", newProject |> unbox<Func<obj,obj>>) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.NewProjectNoFake", newProjectNoFake |> unbox<Func<obj,obj>>) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.NewProjectScaffold", newProjectScaffold |> unbox<Func<obj,obj>>) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.RefreshProjectTemplates", refreshTemplates |> unbox<Func<obj,obj>>) |> context.subscriptions.Add
-        commands.registerTextEditorCommand("fsharp.AddFileToProject", addCurrentFileToProject |> unbox) |> context.subscriptions.Add
-        commands.registerTextEditorCommand("fsharp.RemoveFileFromProject", removeCurrentFileFromProject |> unbox) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.AddProjectReference", addProjectReference |> unbox<Func<obj,obj>>) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.RemoveProjectReference", removeProjectReference |> unbox<Func<obj,obj>>) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.AddReference", addReference |> unbox<Func<obj,obj>>) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.RemoveReference", removeReference |> unbox<Func<obj,obj>>) |> context.subscriptions.Add
+        context |> Commands.register "fsharp.MoveFileUp" moveFileUp
+        context |> Commands.register "fsharp.MoveFileDown" moveFileDown
+        context |> Commands.register "fsharp.NewProject" newProject
+        context |> Commands.register "fsharp.NewProjectNoFake" newProjectNoFake
+        context |> Commands.register "fsharp.NewProjectScaffold" newProjectScaffold
+        context |> Commands.register "fsharp.RefreshProjectTemplates" refreshTemplates
+        context |> Commands.registerTextEditor "fsharp.AddFileToProject" addCurrentFileToProject
+        context |> Commands.registerTextEditor "fsharp.RemoveFileFromProject" removeCurrentFileFromProject
+        context |> Commands.register "fsharp.AddProjectReference" addProjectReference
+        context |> Commands.register "fsharp.RemoveProjectReference" removeProjectReference
+        context |> Commands.register "fsharp.AddReference" addReference
+        context |> Commands.register "fsharp.RemoveReference" removeReference
         if fs.existsSync templateLocation |> not then refreshTemplates ()
 
         ()

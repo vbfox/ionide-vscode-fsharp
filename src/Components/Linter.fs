@@ -88,4 +88,4 @@ module Linter =
             | _ -> ()
 
         languages.registerCodeActionsProvider (selector, createProvider()) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.lintFix",Func<obj,obj,obj,obj>(fun a b c -> applyQuickFix(a |> unbox, b |> unbox, c |> unbox) |> unbox )) |> context.subscriptions.Add
+        context |> Commands.register "fsharp.lintFix" applyQuickFix

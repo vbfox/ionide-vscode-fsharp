@@ -148,9 +148,18 @@ module Promise =
             tail |> List.fold (fun acc next -> acc |> Ionide.VSCode.Helpers.Promise.bind (fun _ -> f next)) (f x)
 
 module Event =
-
     let invoke (listener: 'T -> _) (event: Fable.Import.vscode.Event<'T>) =
         event.Invoke(unbox<System.Func<_, _>>(fun a -> listener a))
+
+module Commands =
+    open System
+    open Fable.Core
+
+    let inline register (command: string) (callback: 't) (ctx: ExtensionContext) =
+        ctx.subscriptions.Add(commands.registerCommand(command, unbox<Func<obj,obj>> callback))
+
+    let inline registerTextEditor (command: string) (callback: TextEditor -> TextEditorEdit -> 't) (ctx: ExtensionContext) =
+        ctx.subscriptions.Add(commands.registerTextEditorCommand(command, unbox callback))
 
 module Context =
     open Fable.Import

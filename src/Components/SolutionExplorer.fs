@@ -165,9 +165,9 @@ module SolutionExplorer =
                 let collaps =
                     match node with
                     | File _ | Reference _ | ProjectReference _ -> None
-                    | Workspace _ | Project _ -> Some 2
-                    | _ ->  Some 1
-                ti.collapsibleState <- unbox collaps
+                    | Workspace _ | Project _ -> Some TreeItemCollapsibleState.Expanded
+                    | _ ->  Some TreeItemCollapsibleState.Collapsed
+                ti.collapsibleState <- collaps
                 let command =
                     match node with
                     | File (p, _, _)  ->
@@ -240,119 +240,98 @@ module SolutionExplorer =
             emiter.fire (unbox ()) |> unbox)
         |> context.subscriptions.Add
 
-        commands.registerCommand("fsharp.explorer.refresh", Func<obj, obj>(fun _ ->
-            emiter.fire (unbox ()) |> unbox
-        )) |> context.subscriptions.Add
+        context |> Commands.register "fsharp.explorer.refresh" (fun _ ->
+            emiter.fire (unbox ())
+        )
 
-        commands.registerCommand("fsharp.explorer.clearCache", Func<obj, obj>(fun _ ->
-            Project.clearCache ()
-            |> unbox
-        )) |> context.subscriptions.Add
+        context |> Commands.register "fsharp.explorer.clearCache" Project.clearCache
 
-        commands.registerCommand("fsharp.explorer.msbuild.pickHost", Func<obj, obj>(fun _ ->
-            MSBuild.pickMSbuildHostType ()
-            |> unbox
-        )) |> context.subscriptions.Add
+        context |> Commands.register "fsharp.explorer.msbuild.pickHost" MSBuild.pickMSbuildHostType
 
-        commands.registerCommand("fsharp.explorer.moveUp", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.moveUp" (fun m ->
+            match m with
             | File (p, _, _) ->
                 Forge.moveFileUpPath p
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.moveDown", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.moveDown" (fun m ->
+            match m with
             | File (p, _, _) ->
                 Forge.moveFileDownPath p
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.moveToFolder", Func<obj, obj>(fun m ->
-            let folders =
-                getModel()
-                |> getFolders
-
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.moveToFolder" (fun m ->
+            match m with
             | File (p, _, pp) ->
-                Forge.moveFileToFolder folders p pp
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+                let folders = getModel() |> getFolders
+                Forge.moveFileToFolder folders p pp |> ignore
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.removeFile", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.removeFile" (fun m ->
+            match m with
             | File (p, _, _) ->
                 Forge.removeFilePath p
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.renameFile", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.renameFile" (fun m ->
+            match m with
             | File (old, _, proj) ->
-                Forge.renameFilePath old proj
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+                Forge.renameFilePath old proj |> ignore
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.addProjecRef", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.addProjecRef" (fun m ->
+            match m with
             | ProjectReferencesList (_, p) ->
-                Forge.addProjectReferencePath p
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+                Forge.addProjectReferencePath p |> ignore
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.removeProjecRef", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.removeProjecRef" (fun m ->
+            match m with
             | ProjectReference (path, _, p) ->
                 Forge.removeProjectReferencePath path p
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.openProjectFile", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.openProjectFile" (fun m ->
+            match m with
             | Project (path, _, _, _, _, _, _) ->
-                commands.executeCommand("vscode.open", Uri.file(path))
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+                commands.executeCommand("vscode.open", Uri.file(path)) |> ignore
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.msbuild.build", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.msbuild.build" (fun m ->
+            match m with
             | Project (path, _, _, _, _, _, pr) ->
-                MSBuild.buildProjectPath "Build" pr
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+                MSBuild.buildProjectPath "Build" pr |> ignore
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.msbuild.rebuild", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.msbuild.rebuild" (fun m ->
+            match m with
             | Project (path, _, _, _, _, _, pr) ->
-                MSBuild.buildProjectPath "Rebuild" pr
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+                MSBuild.buildProjectPath "Rebuild" pr |> ignore
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.msbuild.clean", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.msbuild.clean" (fun m ->
+            match m with
             | Project (path, _, _, _, _, _, pr) ->
-                MSBuild.buildProjectPath "Clean" pr
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+                MSBuild.buildProjectPath "Clean" pr |> ignore
+            | _ -> ()
+        )
 
-        commands.registerCommand("fsharp.explorer.project.run", Func<obj, obj>(fun m ->
-            match unbox m with
+        context |> Commands.register "fsharp.explorer.project.run" (fun m ->
+            match m with
             | Project (_, _, _, _, _, _, pr) ->
-                Debugger.buildAndRun pr
-                |> unbox
-            | _ -> unbox ()
-        )) |> context.subscriptions.Add
+                Debugger.buildAndRun pr |> ignore
+            | _ -> ()
+        )
 
         // commands.registerCommand("fsharp.explorer.project.debug", Func<obj, obj>(fun m ->
         //     match unbox m with

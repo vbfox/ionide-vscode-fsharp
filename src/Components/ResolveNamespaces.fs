@@ -129,8 +129,7 @@ module ResolveNamespaces =
 
     let activate selector (context: ExtensionContext) =
         languages.registerCodeActionsProvider (selector, createProvider()) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.openNamespace",Func<obj,obj,obj,obj>(fun a b c -> applyOpen(a |> unbox, b |> unbox, c |> unbox) |> unbox )) |> context.subscriptions.Add
-        commands.registerCommand("fsharp.useNamespace",Func<obj,obj,obj,obj>(fun a b c -> applyQualify(a |> unbox, b |> unbox, c |> unbox) |> unbox )) |> context.subscriptions.Add
-
+        context |> Commands.register "fsharp.openNamespace" applyOpen
+        context |> Commands.register "fsharp.useNamespace" applyQualify
 
         ()
