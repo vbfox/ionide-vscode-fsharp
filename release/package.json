@@ -39,8 +39,14 @@
         ],
         "extensions": [
           ".fs",
-          ".fsx",
           ".fsi"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "fsharp-script",
+        "extensions": [
+          ".fsx"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -52,7 +58,7 @@
         "path": "./syntaxes/fsharp.json"
       },
       {
-        "language": "fsharp",
+        "language": "fsharp-script",
         "scopeName": "source.fsharp.fsx",
         "path": "./syntaxes/fsharp.fsx.json"
       },
@@ -86,7 +92,11 @@
       },
       {
         "command": "fsi.SendFile",
-        "title": "FSI: Send File"
+        "title": "FSI: Send File",
+        "icon": {
+          "light": "./images/run-light.svg",
+          "dark": "./images/run-dark.svg"
+        }
       },
       {
         "command": "fsi.SendProjectReferences",
@@ -394,63 +404,63 @@
         },
         {
           "command": "fsi.SendLine",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsi.SendSelection",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsi.SendLastSelection",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsi.SendFile",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsi.SendProjectReferences",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsi.GenerateProjectReferences",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsharp.MoveFileUp",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsharp.MoveFileDown",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsharp.AddFileToProject",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsharp.RemoveFileFromProject",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsharp.getHelp",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "fsharp.generateDoc",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "MSBuild.buildCurrent",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "MSBuild.rebuildCurrent",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         },
         {
           "command": "MSBuild.cleanCurrent",
-          "when": "editorLangId == 'fsharp'"
+          "when": "(editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
         }
       ],
       "view/title": [
@@ -592,7 +602,14 @@
         {
           "command": "fsharp.generateDoc",
           "group": "1_modification",
-          "when": "editorTextFocus && editorLangId == 'fsharp'"
+          "when": "editorTextFocus && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "fsi.SendFile",
+          "when": "editorLangId == 'fsharp-script'",
+          "group": "navigation"
         }
       ]
     },
@@ -608,53 +625,53 @@
         "command": "fsi.SendLine",
         "key": "alt+/",
         "mac": "alt+/",
-        "when": "editorFocus && !findWidgetVisible && editorLangId == 'fsharp'"
+        "when": "editorFocus && !findWidgetVisible && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       },
       {
         "command": "fsi.SendSelection",
         "key": "alt+Enter",
         "mac": "alt+Enter",
-        "when": "editorFocus && !findWidgetVisible && editorLangId == 'fsharp'"
+        "when": "editorFocus && !findWidgetVisible && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       },
       {
         "command": "fsharp.MoveFileUp",
         "key": "ctrl+shift+up",
-        "when": "editorFocus  && editorLangId == 'fsharp'"
+        "when": "editorFocus  && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       },
       {
         "command": "fsharp.MoveFileDown",
         "key": "ctrl+shift+down",
-        "when": "editorFocus && editorLangId == 'fsharp'"
+        "when": "editorFocus && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       },
       {
         "command": "fsharp.generateDoc",
         "key": "alt+shift+j",
-        "when": "editorFocus && editorLangId == 'fsharp'"
+        "when": "editorFocus && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       },
       {
         "command": "Expecto.run",
         "key": "ctrl+F6",
-        "when": "editorFocus && editorLangId == 'fsharp'"
+        "when": "editorFocus && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       },
       {
         "command": "Expecto.runFailed",
         "key": "ctrl+alt+F6",
-        "when": "editorFocus && editorLangId == 'fsharp'"
+        "when": "editorFocus && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       },
       {
         "command": "Expecto.startWatchMode",
         "key": "alt+F6",
-        "when": "editorFocus && editorLangId == 'fsharp'"
+        "when": "editorFocus && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       },
       {
         "command": "FSharp.getHelp",
         "key": "shift+F1",
-        "when": "editorFocus && editorLangId == 'fsharp'"
+        "when": "editorFocus && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       },
       {
         "command": "MSBuild.buildCurrent",
         "key": "ctrl+alt+b",
-        "when": "editorFocus && editorLangId == 'fsharp'"
+        "when": "editorFocus && (editorLangId == 'fsharp' || editorLangId == 'fsharp-script')"
       }
     ],
     "configurationDefaults": {
@@ -843,6 +860,9 @@
     "breakpoints": [
       {
         "language": "fsharp"
+      },
+      {
+        "language": "fsharp-script"
       }
     ],
     "problemMatchers": [
@@ -889,6 +909,7 @@
     "workspaceContains:**/*.fsproj",
     "workspaceContains:**/*.sln",
     "onLanguage:fsharp",
+    "onLanguage:fsharp-script",
     "onCommand:fsi.Start",
     "onCommand:fsharp.NewProject",
     "onCommand:fsharp.NewProjectNoFake",

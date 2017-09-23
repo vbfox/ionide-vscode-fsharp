@@ -10,9 +10,8 @@ open Ionide.VSCode.Helpers
 open Ionide.VSCode.FSharp
 
 let activate (context: ExtensionContext) =
-    let df = createEmpty<DocumentFilter>
-    df.language <- Some "fsharp"
-    let df' : DocumentSelector = df |> U3.Case2
+    let df' : DocumentSelector =
+        [| "fsharp" ; "fsharp-script" |] |> Array.map U2.Case1 |> ResizeArray |> U3.Case3
 
     let legacyFsi = "FSharp.legacyFSI" |> Configuration.get false
     let resolve = "FSharp.resolveNamespaces" |> Configuration.get false
