@@ -3,6 +3,7 @@ namespace Ionide.VSCode.FSharp
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.PowerPack
 open Fable.Import
 open Fable.Import.vscode
 open Fable.Import.Node
@@ -55,7 +56,10 @@ module Fsi =
                 |> Array.ofList
 
             let terminal = window.createTerminal("F# Interactive", Environment.fsi, parms)
-            terminal.processId |> Promise.onSuccess (fun pId -> fsiOutputPID <- Some pId) |> ignore
+            promise {
+                let! pId = terminal.processId
+                fsiOutputPID <- Some pId
+            } |> ignore
 
             fsiOutput <- Some terminal
             sendCd ()
@@ -75,20 +79,24 @@ module Fsi =
 
     let private send (msg : string) =
         let msgWithNewline = msg + "\n;;\n"
-        match fsiOutput with
-        | None -> start ()
-        | Some fo -> Promise.lift fo
-        |> Promise.onSuccess (fun fp ->
-            fp.show true
+        promise {
+            try
+                let! fp =
+                    match fsiOutput with
+                    | None -> start ()
+                    | Some fo -> Promise.lift fo
 
-            //send in chunks of 256, terminal has a character limit
-            msgWithNewline
-            |> chunkStringBySize 256
-            |> List.iter (fun x -> fp.sendText(x,false))
+                fp.show true
 
-            lastSelectionSent <- Some msg)
-        |> Promise.onFail (fun error ->
-            window.showErrorMessage "Failed to send text to FSI" |> ignore)
+                //send in chunks of 256, terminal has a character limit
+                msgWithNewline
+                |> chunkStringBySize 256
+                |> List.iter (fun x -> fp.sendText(x,false))
+
+                lastSelectionSent <- Some msg
+            with
+            | error -> window.showErrorMessage "Failed to send text to FSI" |> ignore
+        }
 
     let private sendLine () =
         let editor = window.activeTextEditor

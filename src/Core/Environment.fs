@@ -7,6 +7,7 @@ namespace Ionide.VSCode.FSharp
 module Environment =
     open Fable.Core
     open Fable.Core.JsInterop
+    open Fable.PowerPack
     open Fable.Import.vscode
     open Fable.Import.Node
     open Ionide.VSCode.Helpers

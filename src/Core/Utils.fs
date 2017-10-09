@@ -166,7 +166,7 @@ module Array =
 module Markdown =
     open System.Text.RegularExpressions
 
-    let private stringReplacePatterns = 
+    let private stringReplacePatterns =
         [ "&lt;", "<"
           "&gt;", ">"
           "&quot;", "\""
@@ -203,8 +203,8 @@ module Markdown =
                 let rec loop res : string =
                     match regex.Match res with
                     | m when m.Success ->
-                        let [| firstGroup |], otherGroups = 
-                            m.Groups 
+                        let [| firstGroup |], otherGroups =
+                            m.Groups
                             |> Seq.cast<Group>
                             |> Seq.map (fun g -> g.Value)
                             |> Seq.toArray
@@ -215,7 +215,7 @@ module Markdown =
             ) str
 
         stringReplacePatterns
-        |> List.fold (fun (res: string) (oldValue, newValue) -> 
+        |> List.fold (fun (res: string) (oldValue, newValue) ->
             res.Replace(oldValue, newValue)
         ) res
 
@@ -229,18 +229,32 @@ module Markdown =
         |> (fun v -> MarkdownString v)
 
 module Promise =
+    open Fable.Core
+    open Fable.PowerPack
     open Fable.Import.JS
     open Ionide.VSCode.Helpers
 
     let suppress (pr:Promise<'T>) =
-        pr |> Ionide.VSCode.Helpers.Promise.catch (fun _ -> promise { () })
+        pr |> Fable.PowerPack.Promise.catch (fun _ -> promise { () })
+
+    /// <summary>
+    /// Allows handing promise which is in rejected state. Propagates rejected promise, to allow chaining.
+    /// Can be used for side-effects.
+    /// </summary>
+    let onFail (a : obj -> unit) (pr : Promise<'T>) : Promise<'T> =
+        pr.catch (unbox<Func<obj, U2<'T, PromiseLike<'T>>>> (fun reason -> a reason |> ignore; Promise.reject reason))
+
+    [<Emit("Promise.all($0)")>]
+    let all (pr: seq<Promise<'T>>): Promise<'T[]> = jsNative
+
+    let empty<'T> = Fable.PowerPack.Promise.lift (unbox<'T>null)
 
     let executeForAll f items =
         match items with
-        | [] -> Ionide.VSCode.Helpers.Promise.lift (null |> unbox)
+        | [] -> Fable.PowerPack.Promise.lift (null |> unbox)
         | [x] -> f x
         | x::tail ->
-            tail |> List.fold (fun acc next -> acc |> Ionide.VSCode.Helpers.Promise.bind (fun _ -> f next)) (f x)
+            tail |> List.fold (fun acc next -> acc |> Fable.PowerPack.Promise.bind (fun _ -> f next)) (f x)
 
 module Event =
 

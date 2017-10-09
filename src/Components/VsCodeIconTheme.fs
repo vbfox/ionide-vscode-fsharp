@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.PowerPack
 open Fable.Import
 open Fable.Import.Node
 open Fable.Import.vscode
@@ -147,7 +148,7 @@ module VsCodeIconTheme =
         Promise.create(fun resolve reject ->
             Fs.readFile(path, fun err buffer ->
                 if JS.isDefined err then
-                    reject err
+                    reject (unbox err)
                 else
                     resolve buffer
             )

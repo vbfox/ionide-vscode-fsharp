@@ -4,6 +4,7 @@ open System
 open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.PowerPack
 open Fable.Import
 open Fable.Import.vscode
 open Fable.Import.Node

@@ -3,6 +3,7 @@
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.PowerPack
 open Fable.Import
 open Fable.Import.vscode
 open Fable.Import.Node
@@ -420,13 +421,13 @@ module LanguageService =
                 let error = unbox<JS.Error> e
                 fsacStdoutWriter (error.message)
                 if not isResolvedAsStarted then
-                    reject (error.message)
+                    reject (unbox error.message)
             )
             |> Process.onErrorOutput (fun n ->
                 let buffer = unbox<Buffer.Buffer> n
                 fsacStdoutWriter (buffer.toString())
                 if not isResolvedAsStarted then
-                    reject (buffer.toString())
+                    reject (unbox (buffer.toString()))
             )
             |> ignore
         )
