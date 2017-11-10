@@ -2,6 +2,7 @@ namespace Ionide.VSCode.FSharp
 
 [<AutoOpen>]
 module Logging =
+    open Fable.PowerPack
     open Fable.Import.Node
     open Fable.Import.vscode
     open Ionide.VSCode.FSharp.Node.Util
@@ -92,6 +93,11 @@ module Logging =
         /// Logs a message that should/could be seen by the user in the output channel if the promise fail.
         /// The templates may use node util.format placeholders: %s, %d, %j, %%
         /// https://nodejs.org/api/util.html#util_util_format_format
-        member this.ErrorOnFailed text (p: Fable.Import.JS.Promise<_>) =
-            p.catch(Func<obj,unit>(fun err -> this.Error(text + ": %O", err)))
+        member this.ErrorOnFailed text (p: Fable.Import.JS.Promise<'a>) =
+            p
+            |> Promise.catchBind(fun err ->
+                this.Error(text + ": %O", err)
+                Fable.Import.JS.Promise.reject<'a> err)
             |> ignore
+
+    let consoleOnlyLogger name = ConsoleAndOutputChannelLogger(Some name, Level.DEBUG, None, Some Level.DEBUG)

@@ -65,7 +65,6 @@ module Fsi =
             sendCd ()
             terminal.show(true)
             return terminal
-
             }
         |> Promise.onFail (fun _ ->
             window.showErrorMessage "Failed to spawn FSI, please ensure it's in PATH" |> ignore)
@@ -103,10 +102,10 @@ module Fsi =
         let file = editor.document.fileName
         let pos = editor.selection.start
         let line = editor.document.lineAt pos
-        send line.text
-        |> Promise.onSuccess (fun _ -> commands.executeCommand "cursorDown" |> ignore)
+        promise {
+            let! _ = send line.text
+            commands.executeCommand "cursorDown" |> ignore}
         |> Promise.suppress // prevent unhandled promise exception
-        |> ignore
 
     let private sendSelection () =
         let editor = window.activeTextEditor
@@ -119,19 +118,16 @@ module Fsi =
             let text = editor.document.getText range
             send text
             |> Promise.suppress // prevent unhandled promise exception
-            |> ignore
 
     let private sendLastSelection () =
         match lastSelectionSent with
         | Some x ->
-            if "FSharp.saveOnSendLastSelection" |> Configuration.get false then
-                window.activeTextEditor.document.save ()
-            else
-                Promise.lift true
-            |> Promise.bind(fun _ ->
-                send x)
+            promise {
+                if "FSharp.saveOnSendLastSelection" |> Configuration.get false then
+                    do! window.activeTextEditor.document.save () |> Promise.ignore
+                do! send x
+            }
             |> Promise.suppress // prevent unhandled promise exception
-            |> ignore
         | None -> ()
 
     let private sendFile () =
@@ -139,7 +135,6 @@ module Fsi =
         let text = editor.document.getText ()
         send text
         |> Promise.suppress // prevent unhandled promise exception
-        |> ignore
 
     let private referenceAssembly (path:ProjectReferencePath) = path |> sprintf "#r @\"%s\"" |> send
     let private referenceAssemblies = Promise.executeForAll referenceAssembly
@@ -152,13 +147,12 @@ module Fsi =
     let private handleCloseTerminal (terminal:Terminal) =
         fsiOutputPID
         |> Option.iter (fun currentTerminalPID ->
-            terminal.processId
-            |> Promise.onSuccess (fun closedTerminalPID ->
+            promise {
+                let! closedTerminalPID = terminal.processId
                 if closedTerminalPID = currentTerminalPID then
                     fsiOutput <- None
-                    fsiOutputPID <- None)
-            |> Promise.suppress // prevent unhandled promise exception
-            |> ignore)
+                    fsiOutputPID <- None }
+            |> Promise.suppress) // prevent unhandled promise exception
         |> ignore
 
     let private generateProjectReferences () =

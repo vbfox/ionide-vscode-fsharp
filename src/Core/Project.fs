@@ -117,12 +117,13 @@ module Project =
                 Some (pr.Data.Project, (ProjectLoadingState.Loaded pr.Data))
             else
                 None
-        let failed (b: obj) =
+
+        let failed (b: Exception) =
             let (msg: string), (err: ErrorData) = unbox b
             Some (path, (ProjectLoadingState.Failed (path, msg)))
 
         LanguageService.project path
-        |> Promise.either (loaded >> Promise.lift) (failed >> Promise.lift)
+        |> Promise.either (loaded >> U2.Case1) (failed >> U2.Case1)
         |> Promise.map (fun proj ->
             match proj with
             | Some (path, state) ->

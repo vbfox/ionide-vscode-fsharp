@@ -34,11 +34,12 @@ module Linter =
     let private lintDocument path =
         fixes.Clear()
         if isLinterEnabled () then
-            LanguageService.lint path
-            |> Promise.onSuccess (fun (ev : LintResult) ->
+            promise {
+                let! ev = LanguageService.lint path
                 if isNotNull ev then
                     ev.Data |> Array.where (fun a -> isNotNull a.Fix) |> Array.map (fun a ->a.Fix) |> fixes.AddRange
-                    (Uri.file path, mapResult path ev |> Seq.map fst |> ResizeArray) |> currentDiagnostic.set)
+                    (Uri.file path, mapResult path ev |> Seq.map fst |> ResizeArray) |> currentDiagnostic.set
+            }
             |> ignore
 
     let mutable private timer = None
@@ -77,8 +78,10 @@ module Linter =
         let edit = WorkspaceEdit()
         let uri = Uri.file doc.fileName
         edit.replace(uri, range, suggestion)
-        workspace.applyEdit edit
-        |> Promise.onSuccess (fun _ -> lintDocument doc.fileName)
+        promise {
+            do! workspace.applyEdit edit |> Promise.ignore
+            lintDocument doc.fileName
+        }
 
     let activate selector (context: ExtensionContext) =
         refresh.event $ (handler,(), context.subscriptions) |> ignore
@@ -88,4 +91,8 @@ module Linter =
             | _ -> ()
 
         languages.registerCodeActionsProvider (selector, createProvider()) |> context.subscriptions.Add
+        printfn "BEFORE"
+        JS.console.trace "BEFORE"
         commands.registerCommand("fsharp.lintFix",Func<obj,obj,obj,obj>(fun a b c -> applyQuickFix(a |> unbox, b |> unbox, c |> unbox) |> unbox )) |> context.subscriptions.Add
+        JS.console.trace "AFTER"
+        printfn "AFTER"

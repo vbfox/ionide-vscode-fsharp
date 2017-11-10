@@ -121,23 +121,20 @@ module Errors =
     //         if window.activeTextEditor.document.fileName <> file then
     //             currentDiagnostic.set(Uri.file file, errors |> Seq.map fst |> ResizeArray))
 
-    let parseVisibleTextEditors () =
-        match window.visibleTextEditors |> Seq.toList with
-        | [] -> Promise.lift (null |> unbox)
-        | [x] -> parseFile x.document
-                 |> Promise.onSuccess (fun _ -> handlerSave x.document |> ignore)
-        | x::tail ->
-            tail
-            |> List.fold (fun acc e -> acc |> Promise.bind(fun _ -> parseFile e.document ) )
-               (parseFile x.document )
-            |> Promise.onSuccess (fun _ -> handlerSave x.document |> ignore)
+    let parseVisibleTextEditors () = promise {
+        for textEditor in window.visibleTextEditors do
+            do! parseFile textEditor.document
+
+        match window.visibleTextEditors |> Seq.tryHead with
+        | Some textEditor -> do! handlerSave textEditor.document
+        | _ -> ()
+    }
 
     let activate (context: ExtensionContext) =
         workspace.onDidChangeTextDocument $ (handler,(), context.subscriptions) |> ignore
         workspace.onDidSaveTextDocument $ (handlerSave , (), context.subscriptions) |> ignore
         window.onDidChangeActiveTextEditor $ (handlerOpen, (), context.subscriptions) |> ignore
         //LanguageService.registerNotify handleNotification
-        Promise.lift parseVisibleTextEditors
-
+        parseVisibleTextEditors
 
 

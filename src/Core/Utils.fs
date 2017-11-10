@@ -235,7 +235,7 @@ module Promise =
     open Ionide.VSCode.Helpers
 
     let suppress (pr:Promise<'T>) =
-        pr |> Fable.PowerPack.Promise.catch (fun _ -> promise { () })
+        pr |> Fable.PowerPack.Promise.catch (fun _ -> unbox ()) |> ignore
 
     /// <summary>
     /// Allows handing promise which is in rejected state. Propagates rejected promise, to allow chaining.
@@ -244,10 +244,28 @@ module Promise =
     let onFail (a : obj -> unit) (pr : Promise<'T>) : Promise<'T> =
         pr.catch (unbox<Func<obj, U2<'T, PromiseLike<'T>>>> (fun reason -> a reason |> ignore; Promise.reject reason))
 
-    [<Emit("Promise.all($0)")>]
-    let all (pr: seq<Promise<'T>>): Promise<'T[]> = jsNative
+    /// <summary>
+    /// Returns a Promise object that is rejected with the given reason.
+    /// </summary>
+    [<Emit("Promise.reject($0)")>]
+    let reject<'T> reason : Promise<'T> =
+        jsNative
 
-    let empty<'T> = Fable.PowerPack.Promise.lift (unbox<'T>null)
+    /// <summary>
+    /// Returns a single Promise that resolves when all of the promises in the iterable argument have resolved or when
+    /// the iterable argument contains no promises. It rejects with the reason of the first promise that rejects.
+    /// </summary>
+    [<Emit("Promise.all($0)")>]
+    let all (pr: seq<Promise<'T>>): Promise<'T[]> =
+        jsNative
+
+    [<Emit("Promise.resolve()")>]
+    let empty<'T> : Promise<'T> =
+        jsNative
+
+    [<Emit("$0")>]
+    let inline ignore (promise: Promise<'T>): Promise<unit> =
+        promise |> Fable.PowerPack.Promise.map ignore
 
     let executeForAll f items =
         match items with
