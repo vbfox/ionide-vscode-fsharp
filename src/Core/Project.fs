@@ -248,14 +248,63 @@ module Project =
     let countProjectsInSln (sln: WorkspacePeekFoundSolution) =
         sln.Items |> Array.map foldFsproj |> Array.sumBy Array.length
 
-    let pickFSACWorkspace (ws: WorkspacePeekFound list) =
+    [<RequireQualifiedAccess>]
+    type ConfiguredWorkspace =
+        | Solution of path: string
+        | Directory of path: string
+
+    module private CurrentWorkspaceConfiguration =
+        let private key = "FSharp.workspacePath"
+
+        let get () =
+            let config = workspace.getConfiguration().get<string option>(key)
+            match config with
+            | None -> None
+            | Some ws ->
+                let fullPath = Path.join(workspace.rootPath, ws)
+                if ws.ToLowerInvariant().EndsWith(".sln") then
+                    Some (ConfiguredWorkspace.Solution fullPath)
+                else
+                    Some (ConfiguredWorkspace.Directory fullPath)
+
+        let set (value: ConfiguredWorkspace) =
+            let path =
+                match value with
+                | ConfiguredWorkspace.Solution path -> path
+                | ConfiguredWorkspace.Directory path -> path
+            let relativePath = Path.relative(workspace.rootPath, path)
+            let config = workspace.getConfiguration()
+            config.update(key, relativePath, false)
+
+        let setFromPeek (value: WorkspacePeekFound) =
+            match value with
+            | WorkspacePeekFound.Directory dir -> ConfiguredWorkspace.Directory dir.Directory
+            | WorkspacePeekFound.Solution sln -> ConfiguredWorkspace.Solution sln.Path
+            |> set
+
+        let equalPeek (peek: WorkspacePeekFound) (value: ConfiguredWorkspace option) =
+            match peek with
+            | WorkspacePeekFound.Directory dir -> value = Some (ConfiguredWorkspace.Directory dir.Directory)
+            | WorkspacePeekFound.Solution sln -> value = Some (ConfiguredWorkspace.Solution sln.Path)
+
+    let pickFSACWorkspace (ws: WorkspacePeekFound list) (defaultPick: ConfiguredWorkspace option) =
+        let isDefault (x: WorkspacePeekFound) =
+            defaultPick |> CurrentWorkspaceConfiguration.equalPeek x
+
         let text (x: WorkspacePeekFound) =
+            let check = if isDefault x then "✔ " else ""
             match x with
             | WorkspacePeekFound.Directory dir ->
-                sprintf "[DIR] %s     (%i projects)" dir.Directory dir.Fsprojs.Length
+                let item = createEmpty<QuickPickItem>
+                item.label <- sprintf "%s%s" check dir.Directory
+                item.detail <- Some (sprintf "Directory with %i projects" dir.Fsprojs.Length)
+                item
             | WorkspacePeekFound.Solution sln ->
-                let relativeSln = Path.relative (workspace.rootPath, sln.Path)
-                sprintf "[SLN] %s     (%i projects)" relativeSln (countProjectsInSln sln)
+                let relative = Path.relative (workspace.rootPath, sln.Path)
+                let item = createEmpty<QuickPickItem>
+                item.label <- sprintf "%s%s" check relative
+                item.detail <- Some (sprintf "Solution with %i projects" (countProjectsInSln sln))
+                item
         match ws |> List.map (fun x -> (text x), x) with
         | [] ->
             None |> Promise.lift
@@ -265,9 +314,15 @@ module Project =
                 opts.placeHolder <- Some "Place"
                 let chooseFrom = projects |> List.map fst |> ResizeArray
                 let! chosen = window.showQuickPick(chooseFrom |> U2.Case1, opts)
-                return if JS.isDefined chosen
-                       then projects |> Map.ofList |> Map.tryFind chosen
-                       else None
+                if JS.isDefined chosen then
+                    let selected = projects |> List.tryFind (fun (qp, _) -> qp = chosen) |> Option.map snd
+                    match selected with
+                    | Some selected ->
+                        do! CurrentWorkspaceConfiguration.setFromPeek selected
+                        return Some selected
+                    | None -> return None
+                else
+                    return ws |> List.tryFind isDefault
             }
 
     let isANetCoreAppProject (project:Project) =
@@ -362,6 +417,7 @@ module Project =
         let execDotnet = fun args ->
             let cmd = "run -p " + (String.quote project.Project) + if String.IsNullOrEmpty args then "" else " -- " + args
             execWithDotnetWithShell cmd
+
         match project.Output, isANetCoreAppProject project with
         | _, true -> Some execDotnet
         | out, _ when out |> String.endWith ".exe" -> Some (fun args -> execWithShell out args)
@@ -394,21 +450,23 @@ module Project =
             // prefer the sln, load directly the first one, otherwise ask
             promise {
                 let! ws = workspacePeek ()
-                let slns =
-                    ws
-                    |> List.choose (fun x -> match x with WorkspacePeekFound.Solution _ -> Some x | _ -> None)
+                let configured = CurrentWorkspaceConfiguration.get()
+                let configuredPeek = ws |> List.tryFind (fun x -> CurrentWorkspaceConfiguration.equalPeek x configured)
+                match configuredPeek with
+                | Some peek -> return Some peek
+                | None ->
+                    let slns =
+                        ws |> List.choose (fun x -> match x with WorkspacePeekFound.Solution _ -> Some x | _ -> None)
 
-                let! choosen =
                     match slns with
                     | [] ->
-                        ws
-                        |> List.tryPick (fun x -> match x with WorkspacePeekFound.Directory _ -> Some x | _ -> None)
-                        |> Promise.lift
+                        let firstDir =
+                            ws |> List.tryPick (fun x -> match x with WorkspacePeekFound.Directory _ -> Some x | _ -> None)
+                        return firstDir
                     | [ sln ] ->
-                        Promise.lift (Some sln)
+                        return Some sln
                     | _ ->
-                        pickFSACWorkspace ws
-                return choosen
+                        return! pickFSACWorkspace ws None
             }
         | FSharpWorkspaceMode.Directory ->
             // prefer the directory, like old behaviour (none) but search is done fsac side
@@ -528,7 +586,7 @@ module Project =
 
         commands.registerCommand("fsharp.changeWorkspace", (fun _ ->
             workspacePeek ()
-            |> Promise.bind pickFSACWorkspace
+            |> Promise.bind (fun x -> pickFSACWorkspace x (CurrentWorkspaceConfiguration.get()))
             |> Promise.bind (function Some w -> initWorkspaceHelper parseVisibleTextEditors w  | None -> Promise.empty )
             |> box
             ))

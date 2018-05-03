@@ -94,6 +94,8 @@ module Forge =
                 if JS.isDefined n && JS.isDefined path then
                     sprintf "add project -n %s -p %s" (quotePath n) (quotePath path) |> spawnForge |> ignore }
 
+    let x y = String.startWith "x" y
+
     let removeProjectReferencePath ref proj =
         sprintf "remove project -n %s -p %s" (quotePath ref) (quotePath proj) |> spawnForge |> ignore
 
@@ -109,10 +111,10 @@ module Forge =
                 sprintf "rename file -n %s -r %s -p %s" (quotePath oldName) (quotePath newName) (quotePath proj) |> spawnForge |> ignore
         }
 
-    let moveFileToFolder (folderList : string list) file proj =
+    let moveFileToFolder folderList file proj =
         promise {
             let! _ = sprintf "remove file -n %s" file |> spawnForge |> Process.toPromise
-            if folderList.Length <> 0 then
+            if folderList |> List.length <> 0 then
                 let opts = createEmpty<QuickPickOptions>
                 opts.placeHolder <- Some "Reference"
                 let! n = window.showQuickPick(folderList |> List.toSeq |> ResizeArray |> U2.Case1, opts) |> Promise.map quotePath
@@ -239,7 +241,7 @@ module Forge =
                     |> Array.map (fun t ->
                         let res = createEmpty<QuickPickItem>
                         res.label <- t.value
-                        res.description <- t.name
+                        res.description <- Some t.name
                         res
                     ) |> ResizeArray
 
@@ -287,7 +289,7 @@ module Forge =
                     |> Array.map (fun t ->
                         let res = createEmpty<QuickPickItem>
                         res.label <- t.value
-                        res.description <- t.name
+                        res.description <- Some t.name
                         res
                     ) |> ResizeArray
 

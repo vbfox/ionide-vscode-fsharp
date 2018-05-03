@@ -22,7 +22,6 @@ let activate (context: ExtensionContext) : Api =
     let df = createEmpty<DocumentFilter>
     df.language <- Some "fsharp"
     let df' : DocumentSelector = df |> U3.Case2
-
     let resolve = "FSharp.resolveNamespaces" |> Configuration.get false
     let solutionExplorer = "FSharp.enableTreeView" |> Configuration.get true
 
