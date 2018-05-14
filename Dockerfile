@@ -40,6 +40,7 @@ WORKDIR /build
 # Initialize node_modules
 COPY yarn.lock package.json ./
 RUN yarn install
+RUN npm install -g vsce
 
 # Initialize paket packages
 COPY paket.dependencies paket.lock paket.exe ./
@@ -50,4 +51,6 @@ RUN mono paket.exe restore && cd src && dotnet restore && cd ..
 
 # Copy everything else and run the build
 COPY . ./
-RUN ./build.sh build
+RUN ./build.sh BuildPackage
+
+VOLUME [ "./temp" ]
