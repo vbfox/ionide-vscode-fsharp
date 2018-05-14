@@ -1,0 +1,9 @@
+/.fake/
+/node_modules/
+/packages/
+/paket-files/
+/release/fsharp.js
+/release/fsharp.js.map
+/release/bin*
+/release/schemas/
+/release/syntaxes/
