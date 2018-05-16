@@ -1,4 +1,4 @@
-FROM vbfox/fable-build:aspnet-2.0.8-2.1.200-stretch-mono-5.10.0.160-yarn-1.6.0 AS builder
+FROM vbfox/fable-build:aspnet-2.0.8-2.1.200-stretch-mono-5.10.0.160-yarn-1.6.0
 
 WORKDIR /build
 
