@@ -109,7 +109,7 @@ module Project =
 
     let updateInWorkspace (path : string) state =
         // loadedProjects <- loadedProjects |> Map.add (path.ToUpperInvariant ()) state
-        loadedProjects.Add ((path.ToUpperInvariant ()), state)
+        loadedProjects.[path.ToUpperInvariant ()] <- state
 
     let getProjectsFromWorkspacePeek () =
         match loadedWorkspace with

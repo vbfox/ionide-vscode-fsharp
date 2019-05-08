@@ -44,7 +44,7 @@ module LineLensConfig =
     let getConfig () =
         let cfg = workspace.getConfiguration()
         let fsharpCodeLensConfig = cfg.get("[fsharp]", JsObject.empty).tryGet<bool>("editor.codeLens")
-        
+
         { enabled = cfg.get("FSharp.lineLens.enabled", "replacecodelens") |> parseEnabledMode
           prefix = cfg.get("FSharp.lineLens.prefix", defaultConfig.prefix) }
 
@@ -81,10 +81,11 @@ module Documents =
         | Some x -> x
         | None ->
             let value = { fileName = fileName; cache = None }
-            documents.Add(fileName, value)
+            documents.[fileName] <- value
             value
 
-    let inline set fileName value (documents : Documents) = documents.Add(fileName, value)
+    let inline set fileName value (documents : Documents) =
+        documents.[fileName] <- value
 
     let update info (decorations : ResizeArray<DecorationOptions>) version (documents : Documents) =
         let updated =

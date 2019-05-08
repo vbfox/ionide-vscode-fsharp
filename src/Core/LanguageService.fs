@@ -525,7 +525,6 @@ module LanguageService =
                 return fsacPaths.MSBuild
         }
 
-    [<PassGenerics>]
     let private registerNotifyAll (cb : 'a -> unit) (ws : WebSocket) =
         ws.on_message((fun (res : string) ->
             log.Debug(sprintf "WebSocket message: '%s'" res)
@@ -534,7 +533,6 @@ module LanguageService =
             ) |> unbox) |> ignore
         ()
 
-    [<PassGenerics>]
     let registerNotify (cb : ParseResult -> unit) =
         let onParseResult n =
             if unbox n?Kind = "errors" then
@@ -542,7 +540,6 @@ module LanguageService =
         socketNotify
         |> Option.iter (registerNotifyAll onParseResult)
 
-    [<PassGenerics>]
     let registerNotifyAnalyzer (cb : AnalyzerResult -> unit) =
         let onParseResult n =
             if unbox n?Kind = "analyzer" then
@@ -550,7 +547,6 @@ module LanguageService =
         socketNotifyAnalyzer
         |> Option.iter (registerNotifyAll onParseResult)
 
-    [<PassGenerics>]
     let registerNotifyWorkspace (cb : _ -> unit) =
         let onMessage res =
             match res?Kind |> unbox with

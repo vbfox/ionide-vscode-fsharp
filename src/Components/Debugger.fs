@@ -13,7 +13,7 @@ module node = Fable.Import.Node.Exports
 [<RequireQualifiedAccess>]
 module LaunchJsonVersion2 =
 
-    type [<Pojo>] RequestLaunch =
+    type RequestLaunch =
         { name : string
           ``type`` : string
           request : string
@@ -35,7 +35,7 @@ module LaunchJsonVersion2 =
           console = "externalTerminal"
           stopAtEntry = false }
 
-    type [<Pojo>] RequestAttach =
+    type RequestAttach =
         { name : string
           ``type`` : string
           request : string

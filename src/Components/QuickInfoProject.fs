@@ -4,6 +4,8 @@ open Fable.Core
 open Fable.Import.vscode
 open Fable.Import.Node
 
+open Ionide.VSCode.Helpers.JS
+
 module node = Fable.Import.Node.Exports
 
 module QuickInfoProject =

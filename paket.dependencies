@@ -3,8 +3,7 @@ version 5.169.0
 source https://www.nuget.org/api/v2
 storage:none
 
-clitool dotnet-fable
-nuget Fable.Core
+nuget Fable.Core < 3
 nuget Fable.HtmlConverter
 nuget Fable.Import.Node
 nuget Fable.Import.Browser

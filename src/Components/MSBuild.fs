@@ -9,6 +9,7 @@ open Fable.Import.Node
 
 open DTO
 open Ionide.VSCode.Helpers
+open Ionide.VSCode.Helpers.JS
 open Ionide.VSCode.Helpers.Process
 module node = Fable.Import.Node.Exports
 

@@ -1,3 +1,5 @@
+//@ts-check
+
 var path = require("path");
 var webpack = require("webpack");
 
@@ -17,7 +19,7 @@ var babelOptions = {
     ]
   ],
   plugins: [
-    "@babel/plugin-transform-runtime"
+    //"@babel/plugin-transform-runtime"
   ]
 };
 
@@ -36,13 +38,14 @@ module.exports = function(env) {
   }
 
   return {
+  mode: isProduction ? 'production' : 'development',
   target: 'node',
   devtool: "source-map",
   entry: resolve('./src/Ionide.FSharp.fsproj'),
   output: {
     filename: 'fsharp.js',
     path: resolve('./' + outputPath),
-    libraryTarget: 'commonjs'
+    libraryTarget: 'commonjs2'
   },
   externals: {
     // Who came first the host or the plugin ?

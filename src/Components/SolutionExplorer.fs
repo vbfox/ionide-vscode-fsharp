@@ -7,6 +7,7 @@ open Fable.Import
 open Fable.Import.vscode
 open Fable.Import.Node
 open Ionide.VSCode.Helpers
+open Ionide.VSCode.Helpers.JS
 open System.Collections.Generic
 open System.Text.RegularExpressions
 
@@ -50,7 +51,7 @@ module SolutionExplorer =
             else
                 if state.Children.ContainsKey key |> not then
                     let x = {Key = key; Children = new Dictionary<_,_>()}
-                    state.Children.Add(key,x)
+                    state.Children.[key] <- x
                 let item = state.Children.[key]
                 add' item entry (endIndex + 1)
 
