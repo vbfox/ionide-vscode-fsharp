@@ -6,8 +6,19 @@ function resolve(filePath) {
 }
 
 var babelOptions = {
-  presets: [["es2015", { "modules": false }]],
-  plugins: ["transform-runtime"]
+  presets: [
+    [
+      "@babel/preset-env",
+      {
+        targets: {
+          node: "10.2.0" // Found in VSCode about box
+        }
+      }
+    ]
+  ],
+  plugins: [
+    "@babel/plugin-transform-runtime"
+  ]
 };
 
 var isProduction = process.argv.indexOf("-p") >= 0;
