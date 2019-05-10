@@ -14,7 +14,7 @@ module SignatureData =
             let line = window.activeTextEditor.selection.active.line + 1.
             let col = window.activeTextEditor.selection.active.character + 1.
             LanguageService.signatureData editor.fileName (int line) (int col)
-            |> Promise.bind (fun (p : SignatureDataResult)  ->
+            |> Promise.bind (fun p  ->
                 let pms =
                     p.Data.Parameters
                     |> Seq.concat

@@ -34,9 +34,10 @@ module Project =
         | Projects // send to FSAC multiple "project" command
         | WorkspaceLoad // send to FSAC the workspaceLoad and use notifications
 
-    let private emptyProjectsMap : Dictionary<ProjectFilePath,ProjectLoadingState> = Dictionary()
+    let private emptyProjectsMap() : Dictionary<ProjectFilePath,ProjectLoadingState> =
+        Dictionary()
 
-    let mutable private loadedProjects = emptyProjectsMap
+    let mutable private loadedProjects = emptyProjectsMap()
 
     let mutable private loadedWorkspace : WorkspacePeekFound option = None
 
@@ -101,15 +102,26 @@ module Project =
         | out, _ when out |> String.endWith ".exe" -> true
         | _ -> false
 
+    [<Emit("console.log(\"loadedProjects\", [...$0.entries()])")>]
+    let private debugLoadedProjects _loadedProjects = ()
+
     let getInWorkspace () =
-        loadedProjects |> Seq.toList |> List.map (fun n -> n.Value)
+        debugLoadedProjects loadedProjects
+        loadedProjects |> Seq.toList |> List.map (fun n ->
+            JS.console.log("pair", n)
+            n.Value)
 
     let tryFindInWorkspace (path : string) =
+        debugLoadedProjects loadedProjects
         loadedProjects |> Seq.tryFind (fun n -> n.Key = path.ToUpperInvariant ()) |> Option.map (fun n -> n.Value)
 
     let updateInWorkspace (path : string) state =
         // loadedProjects <- loadedProjects |> Map.add (path.ToUpperInvariant ()) state
+        JS.console.log("Add", path, state)
+        debugLoadedProjects loadedProjects
         loadedProjects.[path.ToUpperInvariant ()] <- state
+        debugLoadedProjects loadedProjects
+        JS.console.log("Get", loadedProjects.[path.ToUpperInvariant ()])
 
     let getProjectsFromWorkspacePeek () =
         match loadedWorkspace with
@@ -214,7 +226,8 @@ module Project =
         | rootPath -> rootPath |> findProjs
 
     let private clearLoadedProjects () =
-        loadedProjects <- emptyProjectsMap
+        loadedProjects <- emptyProjectsMap()
+        debugLoadedProjects loadedProjects
         setAnyProjectContext false
 
     let load comingFromRestore (path : string) =
@@ -659,6 +672,7 @@ module Project =
             match res with
             | Choice1Of4 (pr: ProjectResult) ->
                 projectLoadedEmitter.fire (pr.Data)
+                JS.console.log("Loaded", pr)
                 Some (true, pr.Data.Project, (ProjectLoadingState.Loaded pr.Data))
             | Choice2Of4 (pr: ProjectLoadingResult) ->
                 Some (false, pr.Data.Project, (ProjectLoadingState.Loading pr.Data.Project))

@@ -59,18 +59,18 @@ module Analyzers =
         workspace.applyEdit edit
         //|> Promise.onSuccess (fun _ -> lintDocument doc.fileName) //TODO
 
-    let private mapResult file (ev : AnalyzerResult) =
+    let private mapResult file (ev : AnalyzerResponse) =
         if isNotNull ev then
-            ev.Data.Messages
+            ev.Messages
             |> Seq.map (diagnosticFromAnalyzerMessage file)
             |> ResizeArray
         else
             ResizeArray ()
 
-    let handler (res : AnalyzerResult) =
+    let handler (res : AnalyzerResponse) =
         if isNotNull res then
-            res.Data.Messages |> Array.where (fun a -> isNotNull a.Fixes) |> Array.collect (fun a ->a.Fixes) |> fixes.AddRange
-            (Uri.file res.Data.File, mapResult path res |> Seq.map fst |> ResizeArray) |> currentDiagnostic.set
+            res.Messages |> Array.where (fun a -> isNotNull a.Fixes) |> Array.collect (fun a ->a.Fixes) |> fixes.AddRange
+            (Uri.file res.File, mapResult path res |> Seq.map fst |> ResizeArray) |> currentDiagnostic.set
 
     let activate selector (context : ExtensionContext) =
         let analyzerPaths = "FSharp.analyzersPath" |> Configuration.get [| "packages/Analyzers"; "analyzers" |]

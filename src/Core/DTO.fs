@@ -201,6 +201,7 @@ module DTO =
     type ProjectReferencePath = string
 
     type ProjectLoading = { Project : ProjectFilePath }
+    type WorkspaceLoaded = { Status : string }
 
     [<RequireQualifiedAccess>]
     type ProjectResponseInfo =

@@ -264,7 +264,9 @@ module LanguageService =
     let private handleUntitled (fn : string) = if fn.EndsWith ".fs" || fn.EndsWith ".fsi" || fn.EndsWith ".fsx" then fn else (fn + ".fsx")
 
     let private deserializeProjectResult (res : ProjectResult) =
+        JS.console.log(res)
         let parseInfo (f : obj) =
+            JS.console.log(f)
             match f?SdkType |> unbox with
             | "dotnet/sdk" ->
                 ProjectResponseInfo.DotnetSdk (f?Data |> unbox)
@@ -334,23 +336,19 @@ module LanguageService =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
         |> request "documentation" 0 (makeRequestId())
 
-    let documentationForSymbol xmlSig assembly =
+    let documentationForSymbol xmlSig assembly: JS.Promise<Result<seq<DocumentationDescription []>>> =
         { DocumentationForSymbolReuqest.Assembly = assembly; XmlSig = xmlSig}
         |> request "documentationForSymbol" 0 (makeRequestId())
-
-    let toolbar fn line col =
-        { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "tooltip" 0 (makeRequestId())
 
     let signature fn line col =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
         |> request<_, Result<string>> "signature" 0 (makeRequestId())
 
-    let findDeclaration fn line col =
+    let findDeclaration fn line col: JS.Promise<FindDeclarationResult> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
         |> request "finddeclaration" 0 (makeRequestId())
 
-    let findTypeDeclaration fn line col =
+    let findTypeDeclaration fn line col: JS.Promise<FindDeclarationResult> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
         |> request "findtypedeclaration" 0 (makeRequestId())
 
@@ -358,7 +356,7 @@ module LanguageService =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
         |> request "help" 0 (makeRequestId())
 
-    let signatureData fn line col =
+    let signatureData fn line col: JS.Promise<SignatureDataResult> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
         |> request "signatureData" 0 (makeRequestId())
 
@@ -525,38 +523,201 @@ module LanguageService =
                 return fsacPaths.MSBuild
         }
 
-    let private registerNotifyAll (cb : 'a -> unit) (ws : WebSocket) =
+    type LanguageServiceMessage =
+    | Analyzer of AnalyzerResponse
+    | WorkspaceLoaded of WorkspaceLoaded
+    | Project of Project
+
+    module MessageDecoding =
+        open Thoth.Json
+
+        type private JsonValue = obj
+        type private BoxedDecoder = Decode.Decoder<obj>
+
+        module private Helpers =
+            [<Emit("typeof $0")>]
+            let jsTypeof (_ : JsonValue) : string = jsNative
+
+            [<Emit("$0 instanceof SyntaxError")>]
+            let isSyntaxError (_ : JsonValue) : bool = jsNative
+
+            let inline getField (fieldName: string) (o: JsonValue) = o?(fieldName)
+            let inline isString (o: JsonValue) : bool = o :? string
+
+            let inline isBoolean (o: JsonValue) : bool = o :? bool
+
+            let inline isNumber (o: JsonValue) : bool = jsTypeof o = "number"
+
+            let inline isArray (o: JsonValue) : bool = JS.Array.isArray(o)
+
+            [<Emit("$0 === null ? false : (Object.getPrototypeOf($0 || false) === Object.prototype)")>]
+            let isObject (_ : JsonValue) : bool = jsNative
+
+            let inline isNaN (o: JsonValue) : bool = JS.Number.isNaN(!!o)
+
+            let inline isNullValue (o: JsonValue): bool = isNull o
+
+            [<Emit("-2147483648 < $0 && $0 < 2147483647 && ($0 | 0) === $0")>]
+            let isValidIntRange (_: JsonValue) : bool = jsNative
+
+            [<Emit("isFinite($0) && !($0 % 1)")>]
+            let isIntFinite (_: JsonValue) : bool = jsNative
+
+            let isUndefined (o: JsonValue): bool = jsTypeof o = "undefined"
+
+            [<Emit("JSON.stringify($0, null, 4) + ''")>]
+            let anyToString (_: JsonValue) : string = jsNative
+
+            let inline isFunction (o: JsonValue) : bool = jsTypeof o = "function"
+
+            let inline objectKeys (o: JsonValue) : string seq = upcast JS.Object.keys(o)
+            let inline asBool (o: JsonValue): bool = unbox o
+            let inline asInt (o: JsonValue): int = unbox o
+            let inline asFloat (o: JsonValue): float = unbox o
+            let inline asString (o: JsonValue): string = unbox o
+            let inline asArray (o: JsonValue): JsonValue[] = unbox o
+
+        let private autoObject2 (keyDecoder: BoxedDecoder) (valueDecoder: BoxedDecoder) (path : string) (value: JsonValue) =
+            if not (Helpers.isObject value) then
+                (path, Decode.BadPrimitive ("an object", value)) |> Core.Error
+            else
+                (Ok [], Helpers.objectKeys(value)) ||> Seq.fold (fun acc name ->
+                    match acc with
+                    | Core.Error _ -> acc
+                    | Core.Ok acc ->
+                        match keyDecoder path name with
+                        | Core.Error er -> Core.Error er
+                        | Core.Ok k ->
+                            match Decode.field name valueDecoder path value with
+                            | Core.Error er -> Core.Error er
+                            | Core.Ok v -> (k,v)::acc |> Ok)
+
+        let private toMap<'key, 'value when 'key: comparison> (xs: ('key*'value) seq) = Map.ofSeq xs
+
+        let inline private autoMapDecoder<'key, 'value when 'key: comparison>() =
+            let keyDecoder = Decode.Auto.generateDecoder<'key>(false) |> unbox<BoxedDecoder>
+            let valueDecoder = Decode.Auto.generateDecoder<'value> false |> unbox<BoxedDecoder>
+            Decode.oneOf [
+                autoObject2 keyDecoder valueDecoder
+                Decode.list (Decode.tuple2 keyDecoder valueDecoder)
+            ]
+            |> Decode.map (fun ar -> toMap (unbox ar) |> box)
+            |> unbox<Decode.Decoder<Map<'key, 'value>>>
+
+        let inline private webSocketMessageDecoder<'a> (create: 'a -> LanguageServiceMessage) (path: string) (v: obj) =
+            JS.console.log("From", JS.JSON.stringify(v))
+            let decoder = Decode.Auto.generateDecoder<'a>(false)
+            let decoded = decoder path v
+            let result = decoded |> Result.map create
+            JS.console.log("To", sprintf "%A" result)
+            result
+
+        let private projectResponseInfoDotnetSdkDecoder =
+            Decode.Auto.generateDecoder<ProjectResponseInfoDotnetSdk>(false)
+
+        let private infoDecoder: Decode.Decoder<ProjectResponseInfo> =
+            Decode.object (fun get ->
+                let sdkType = get.Required.Field "SdkType" Decode.string
+                match sdkType with
+                | "dotnet/sdk" ->
+                    let data = get.Required.Field "Data" projectResponseInfoDotnetSdkDecoder
+                    ProjectResponseInfo.DotnetSdk data
+                | "verbose" ->
+                    ProjectResponseInfo.Verbose
+                | "project.json" ->
+                    ProjectResponseInfo.ProjectJson
+                | _ ->
+                    failwithf "Unknown SDK type: %s" sdkType
+            )
+
+        let private stringStringMapDecoder = autoMapDecoder<string, string> ()
+
+        let private projectDecoder: Decode.Decoder<Project> =
+            Decode.object (fun get ->
+                {
+                    Project = get.Required.Field "Project" Decode.string
+                    Files = get.Required.Field "Files" (Decode.list Decode.string)
+                    Output = get.Required.Field "Output" Decode.string
+                    References = get.Required.Field "References" (Decode.list Decode.string)
+                    Logs = get.Required.Field "Logs" stringStringMapDecoder
+                    OutputType = get.Required.Field "OutputType" Decode.string
+                    Info = get.Required.Field "Info" infoDecoder
+                    AdditionalInfo = get.Required.Field "AdditionalInfo" stringStringMapDecoder
+                }
+            )
+
+        let private dataDecoder (kind: string) (path: string) (v: obj) =
+            match kind with
+            | "analyzer" ->
+                JS.console.log("analyzer", v)
+                webSocketMessageDecoder<AnalyzerResponse> Analyzer path v
+            | "workspaceLoad" ->
+                JS.console.log("workspaceLoad", v)
+                webSocketMessageDecoder<WorkspaceLoaded> WorkspaceLoaded path v
+            | "project" ->
+                JS.console.log("project", v)
+                projectDecoder path v |> Result.map Project
+            | other ->
+                let err = path, Decode.ErrorReason.FailMessage (sprintf "Unknown Kind '%s'" other)
+                Core.Result.Error err
+
+        let private resultDecoder : Decode.Decoder<LanguageServiceMessage> =
+            Decode.object
+                (fun get ->
+                    let kind = get.Required.Field "Kind" Decode.string
+                    get.Required.Field "Data" (dataDecoder kind)
+                )
+
+        let fromString (res: string) =
+            let n = Decode.fromString resultDecoder res
+            match n with
+            | Core.Result.Ok n -> n
+            | Core.Result.Error e ->
+                JS.console.error(e)
+                failwithf "JSON DECODING FAILED: %s" e
+
+    let inline private registerNotifyAll (cb : LanguageServiceMessage -> unit) (ws : WebSocket) =
+        printfn "REGISTER NOTIFY"
         ws.on_message((fun (res : string) ->
+            printfn "NOTIFIED"
             log.Debug(sprintf "WebSocket message: '%s'" res)
-            let n = res |> JS.JSON.parse
-            cb (n |> unbox)
+            JS.console.log(sprintf "WebSocket message: '%s'" res)
+
+            cb (MessageDecoding.fromString res)
             ) |> unbox) |> ignore
         ()
 
     let registerNotify (cb : ParseResult -> unit) =
-        let onParseResult n =
+        let onParseResult (n: LanguageServiceMessage) =
             if unbox n?Kind = "errors" then
+                printfn "ERRRRRRR"
                 n |> unbox |> cb
         socketNotify
         |> Option.iter (registerNotifyAll onParseResult)
 
-    let registerNotifyAnalyzer (cb : AnalyzerResult -> unit) =
-        let onParseResult n =
-            if unbox n?Kind = "analyzer" then
-                n |> unbox |> cb
+    let registerNotifyAnalyzer (cb : AnalyzerResponse -> unit) =
+        let onParseResult (n: LanguageServiceMessage) =
+            match n with
+            | Analyzer n -> cb n
+            | _ -> ()
+
         socketNotifyAnalyzer
         |> Option.iter (registerNotifyAll onParseResult)
 
     let registerNotifyWorkspace (cb : _ -> unit) =
-        let onMessage res =
+        let onMessage (res: LanguageServiceMessage) =
             match res?Kind |> unbox with
             | "project" ->
+                printfn "PROJ"
                 res |> unbox<ProjectResult> |> deserializeProjectResult |> Choice1Of4 |> cb
             | "projectLoading" ->
+                printfn "PROJLOAD"
                 res |> unbox<ProjectLoadingResult> |> Choice2Of4 |> cb
             | "error" ->
+                printfn "ERRRRRRR 2"
                 res?Data |> parseError |> Choice3Of4 |> cb
             | "workspaceLoad" ->
+                printfn "WSLOAD"
                 res?Data?Status |> unbox<string> |> Choice4Of4 |> cb
             | _ ->
                 ()

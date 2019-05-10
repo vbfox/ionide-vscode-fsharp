@@ -95,7 +95,10 @@ module SolutionExplorer =
             File(ref None, p, entry.Key, pp)
 
     let buildTree pp (files : string list) =
-        let entry = {Key = ""; Children = new Dictionary<_,_>()}
+        JS.console.log("Building tree", pp, files)
+        let entry = {Key = ""; Children = new Dictionary<_,_>()
+        }
+        JS.console.log("entry", entry)
         files |> List.iter (fun x -> add' entry x 0 |> ignore )
         entry.Children
         |> Seq.map (fun n -> toModel "" pp n.Value )
@@ -106,6 +109,7 @@ module SolutionExplorer =
             Project.getLoaded ()
             |> Seq.toArray
 
+        JS.console.log("proj.Files", proj.Files)
         let files =
             proj.Files
             |> List.map (fun p -> node.path.relative(node.path.dirname proj.Project, p))
@@ -274,6 +278,7 @@ module SolutionExplorer =
                     let root = getRoot()
                     rootChanged.fire root
                     let r = root |> getSubmodel |> ResizeArray
+                    JS.console.log("Root", r)
                     r
 
             member this.getTreeItem(node) =
@@ -368,6 +373,7 @@ module SolutionExplorer =
                         (resourceUri |> Option.map(fun u -> (defaultArg ti.label "") + "||" + u.toString() + "||" + pp))
                     | _ ->
                         (resourceUri |> Option.map(fun u -> (defaultArg ti.label "") + "||" + u.toString()))
+
                 ti
         }
 
