@@ -670,12 +670,12 @@ module Project =
         let disableShowNotification = "FSharp.disableFailedProjectNotifications" |> Configuration.get false
         let projStatus =
             match res with
-            | Choice1Of4 (pr: ProjectResult) ->
-                projectLoadedEmitter.fire (pr.Data)
+            | Choice1Of4 (pr: Project) ->
+                projectLoadedEmitter.fire (pr)
                 JS.console.log("Loaded", pr)
-                Some (true, pr.Data.Project, (ProjectLoadingState.Loaded pr.Data))
-            | Choice2Of4 (pr: ProjectLoadingResult) ->
-                Some (false, pr.Data.Project, (ProjectLoadingState.Loading pr.Data.Project))
+                Some (true, pr.Project, (ProjectLoadingState.Loaded pr))
+            | Choice2Of4 (pr: ProjectLoading) ->
+                Some (false, pr.Project, (ProjectLoadingState.Loading pr.Project))
             | Choice3Of4 (msg, err) ->
                 match err with
                 | ErrorData.ProjectNotRestored d ->

@@ -18,9 +18,9 @@ module Errors =
 
     let mutable private currentDiagnostic = languages.createDiagnosticCollection ()
 
-    let private mapResult (ev : ParseResult) =
+    let private mapResult (ev : ErrorResp) =
         let errors =
-            ev.Data.Errors
+            ev.Errors
             |> Seq.distinctBy (fun error -> error.Severity, error.StartLine, error.StartColumn)
             |> Seq.choose (fun error ->
                 try
@@ -32,7 +32,7 @@ module Errors =
                 with
                 | _ -> None )
             |> ResizeArray
-        ev.Data.File, errors
+        ev.File, errors
 
     type DocumentParsedEvent =
         { fileName : string
@@ -59,7 +59,7 @@ module Errors =
                 UnusedOpens.refresh.fire fileName
                 UnusedDeclarations.refresh.fire fileName
                 SimplifyName.refresh.fire fileName
-                (Uri.file fileName, (mapResult result |> snd |> Seq.map fst |> ResizeArray)) |> currentDiagnostic.set
+                (Uri.file fileName, (mapResult result.Data |> snd |> Seq.map fst |> ResizeArray)) |> currentDiagnostic.set
                 Some fileName
             else
                 None)
