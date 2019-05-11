@@ -233,10 +233,10 @@ module Project =
     let load comingFromRestore (path : string) =
         updateInWorkspace path (ProjectLoadingState.Loading path)
 
-        let loaded (pr : ProjectResult) =
+        let loaded (pr : Project) =
             if isNotNull pr then
-                projectLoadedEmitter.fire (pr.Data)
-                Some (pr.Data.Project, (ProjectLoadingState.Loaded pr.Data))
+                projectLoadedEmitter.fire (pr)
+                Some (pr.Project, (ProjectLoadingState.Loaded pr))
             else
                 None
 

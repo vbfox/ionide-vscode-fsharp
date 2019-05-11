@@ -333,6 +333,21 @@ module LanguageService =
             let n = Decode.fromString resultDecoder res
             handleError n
 
+        let fromStringX (res: string) =
+            Decode.fromString resultDecoder res
+
+
+        let getOrFail (res: string) (request: string) (extract: FSACMessage -> 'a option) =
+            let n = Decode.fromString resultDecoder res
+            match n with
+            | Core.Error err ->
+                Core.Error (sprintf "Request %s failed with %s" request err)
+            | Core.Ok v ->
+                match extract v with
+                | Some e -> Core.Ok e
+                | None ->
+                     Core.Error (sprintf "Request %s returned an unexpected value: %A" request v)
+
     type FSACResponse<'b> =
         | Error of string * ErrorData
         | Info of obj
@@ -385,43 +400,57 @@ module LanguageService =
         |> Promise.map(fun r ->
             // the outgoing request was made
             try
-                let resObj = (r.data |> unbox<string[]>).[id] |> JS.JSON.parse
-                let res = resObj |> unbox<'b>
+                let jsonString = (r.data |> unbox<string[]>).[id]
+                let res = MessageDecoding.fromStringX jsonString
                 logIncomingResponse requestId fsacAction started r (Some res) None
-                if res?Kind |> unbox = "error" then FSACResponse.Error (res?Data |> parseError)
-                elif res?Kind |> unbox = "info" then FSACResponse.Info (res?Data |> unbox)
-                else FSACResponse.Kind ((res?Kind |> unbox), res)
+                res
             with
             | ex ->
                 logIncomingResponse requestId fsacAction started r None (Some ex)
-                FSACResponse.Invalid
+                Core.Result.Error (sprintf "Error converting response: %s" (ex.ToString()))
         )
 
-    let private request<'a, 'b> (fsacAction : string) id requestId (obj : 'a) =
-         requestRaw fsacAction id requestId obj
-         |> Promise.map(fun (r : FSACResponse<'b>) ->
-             match r with
-             | FSACResponse.Error (msg, err) ->
-                log.Error (prettyPrintError fsacAction msg err)
-                null |> unbox
-             | FSACResponse.Info err -> null |> unbox
-             | FSACResponse.Kind (t, res) -> res
-             | FSACResponse.Invalid -> null |> unbox
-          )
+    let private request<'a, 'b> (fsacAction : string) id requestId (extract: FSACMessage -> 'b option) (obj : 'a) = promise {
+         let! res = requestRaw fsacAction id requestId obj
 
-    let private requestCanFail<'a, 'b> (fsacAction : string) id requestId (obj : 'a) =
-         requestRaw fsacAction id requestId obj
-         |> Promise.bind(fun (r : FSACResponse<'b>) ->
-             match r with
-             | FSACResponse.Error (msg, err) ->
-                log.Error (prettyPrintError fsacAction msg err)
-                Promise.reject (msg, err)
-             | FSACResponse.Kind (t, res) ->
-                Promise.lift res
-             | FSACResponse.Info _
-             | FSACResponse.Invalid ->
-                Promise.lift (null |> unbox)
-          )
+         match res with
+         | Core.Result.Ok x ->
+            match x with
+            | FSACMessage.Error err ->
+                log.Error (prettyPrintError fsacAction err.Message err.Data)
+                return null |> unbox
+            | _ ->
+                match extract x with
+                | Some e -> return e
+                | None ->
+                    let msg = sprintf "Request %s returned an unexpected value: %A" fsacAction x
+                    log.Error (prettyPrintError fsacAction msg ErrorData.GenericError)
+                    return null |> unbox
+         | Core.Result.Error err ->
+            let msg = sprintf "Request %s returned an error: %s" fsacAction err
+            log.Error (prettyPrintError fsacAction msg ErrorData.GenericError)
+            return null |> unbox
+    }
+
+    let private requestCanFail<'a, 'b> (fsacAction : string) id requestId (extract: FSACMessage -> 'b option) (obj : 'a) = promise {
+         let! res = requestRaw fsacAction id requestId obj
+
+         match res with
+         | Core.Result.Ok x ->
+            match x with
+            | FSACMessage.Error err ->
+                log.Error (prettyPrintError fsacAction err.Message err.Data)
+                return raise<'b> (Exception err.Message)
+            | _ ->
+                match extract x with
+                | Some e -> return e
+                | None ->
+                    let msg = sprintf "Request %s returned an unexpected value: %A" fsacAction x
+                    return raise<'b> (Exception(msg))
+         | Core.Result.Error err ->
+            let msg = sprintf "Request %s returned an error: %s" fsacAction err
+            return raise<'b> (Exception(msg))
+    }
 
     let private handleUntitled (fn : string) = if fn.EndsWith ".fs" || fn.EndsWith ".fsi" || fn.EndsWith ".fsx" then fn else (fn + ".fsx")
 
@@ -446,8 +475,7 @@ module LanguageService =
 
     let project s =
         { ProjectRequest.FileName = s }
-        |> requestCanFail "project" 0 (makeRequestId())
-        |> Promise.map deserializeProjectResult
+        |> requestCanFail "project" 0 (makeRequestId()) (function FSACMessage.Project p -> Some p | _ -> None)
         |> Promise.onFail(fun _ ->
             let msg = "Project parsing failed: " + path.basename(s)
             vscode.window.showErrorMessage(msg, "Show status")
@@ -464,94 +492,94 @@ module LanguageService =
           ParseRequest.Lines = lines
           ParseRequest.IsAsync = true
           ParseRequest.Version = int version }
-        |> request "parse" 1 (makeRequestId())
+        |> request "parse" 1 (makeRequestId()) (failwithf "Not supported: %A")
 
     let helptext s =
         { HelptextRequest.Symbol = s }
-        |> request "helptext" 0 (makeRequestId())
+        |> request "helptext" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let completion fn sl line col keywords external version =
         { CompletionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "Contains"; SourceLine = sl; IncludeKeywords = keywords; IncludeExternal = external; Version = version }
-        |> request "completion" 1 (makeRequestId())
+        |> request "completion" 1 (makeRequestId()) (failwithf "Not supported: %A")
 
     let symbolUse fn line col =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "symboluse" 0 (makeRequestId())
+        |> request "symboluse" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let symbolUseProject fn line col =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "symboluseproject" 0 (makeRequestId())
+        |> request "symboluseproject" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let symbolImplementationProject fn line col =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "symbolimplementation" 0 (makeRequestId())
+        |> request "symbolimplementation" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let methods fn line col =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "methods" 0 (makeRequestId())
+        |> request "methods" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let tooltip fn line col =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "tooltip" 0 (makeRequestId())
+        |> request "tooltip" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let documentation fn line col =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "documentation" 0 (makeRequestId())
+        |> request "documentation" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let documentationForSymbol xmlSig assembly: JS.Promise<Result<seq<DocumentationDescription []>>> =
         { DocumentationForSymbolReuqest.Assembly = assembly; XmlSig = xmlSig}
-        |> request "documentationForSymbol" 0 (makeRequestId())
+        |> request "documentationForSymbol" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let signature fn line col =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request<_, Result<string>> "signature" 0 (makeRequestId())
+        |> request<_, Result<string>> "signature" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let findDeclaration fn line col: JS.Promise<FindDeclarationResult> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "finddeclaration" 0 (makeRequestId())
+        |> request "finddeclaration" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let findTypeDeclaration fn line col: JS.Promise<FindDeclarationResult> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "findtypedeclaration" 0 (makeRequestId())
+        |> request "findtypedeclaration" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let f1Help fn line col : JS.Promise<Result<string>> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "help" 0 (makeRequestId())
+        |> request "help" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let signatureData fn line col: JS.Promise<SignatureDataResult> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "signatureData" 0 (makeRequestId())
+        |> request "signatureData" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let declarations fn (text : string) version =
         let lines = text.Replace("\uFEFF", "").Split('\n')
         { DeclarationsRequest.FileName = handleUntitled fn; Lines = lines; Version = version }
-        |> request<_, Result<Symbols[]>> "declarations" 0 (makeRequestId())
+        |> request<_, Result<Symbols[]>> "declarations" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let declarationsProjects () =
-        "" |> request "declarationsProjects" 0 (makeRequestId())
+        "" |> request "declarationsProjects" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let compilerLocation () =
-        "" |> request<string, CompilerLocationResult> "compilerlocation" 0 (makeRequestId())
+        "" |> request<string, CompilerLocationResult> "compilerlocation" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let lint s =
         { ProjectRequest.FileName = s }
-        |> request "lint" 0 (makeRequestId())
+        |> request "lint" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let resolveNamespaces fn line col =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "namespaces" 0 (makeRequestId())
+        |> request "namespaces" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let unionCaseGenerator fn line col : JS.Promise<Result<UnionCaseGenerator>> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "unionCaseGenerator" 0 (makeRequestId())
+        |> request "unionCaseGenerator" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let recordStubGenerator fn line col : JS.Promise<Result<RecordStubCaseGenerator>> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "recordStubGenerator" 0 (makeRequestId())
+        |> request "recordStubGenerator" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let interfaceStubGenerator fn line col : JS.Promise<Result<InterfaceStubGenerator>> =
         { PositionRequest.Line = line; FileName = handleUntitled fn; Column = col; Filter = "" }
-        |> request "interfaceStubGenerator" 0 (makeRequestId())
+        |> request "interfaceStubGenerator" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let workspacePeek dir deep excludedDirs =
         let rec mapItem (f : WorkspacePeekFoundSolutionItem) : WorkspacePeekFoundSolutionItem option =
@@ -594,42 +622,42 @@ module LanguageService =
             { WorkspacePeek.Found = ws?Found |> unbox |> Array.choose mapFound }
 
         { WorkspacePeekRequest.Directory = dir; Deep = deep; ExcludedDirs = excludedDirs |> Array.ofList }
-        |> request "workspacePeek" 0 (makeRequestId())
+        |> request "workspacePeek" 0 (makeRequestId()) (failwithf "Not supported: %A")
         |> Promise.map (fun res -> parse (res?Data |> unbox))
 
     let workspaceLoad disableInMemoryProject projects  =
         { WorkspaceLoadRequest.Files = projects |> List.toArray; DisableInMemoryProjectReferences = disableInMemoryProject }
-        |> request "workspaceLoad" 0 (makeRequestId())
+        |> request "workspaceLoad" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let unusedDeclarations s =
         { ProjectRequest.FileName = s }
-        |> request "unusedDeclarations" 0 (makeRequestId())
+        |> request "unusedDeclarations" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let unusedOpens s =
         { ProjectRequest.FileName = s }
-        |> request "unusedOpens" 0 (makeRequestId())
+        |> request "unusedOpens" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let simplifiedNames s =
         { ProjectRequest.FileName = s }
-        |> request "simplifiedNames" 0 (makeRequestId())
+        |> request "simplifiedNames" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let projectsInBackground s =
         { ProjectRequest.FileName = s }
-        |> request "projectsInBackground" 0 (makeRequestId())
+        |> request "projectsInBackground" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let compile s =
         { ProjectRequest.FileName = s }
-        |> request "compile" 0 (makeRequestId())
+        |> request "compile" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let enableSymbolCache () =
-        "" |> request "enableSymbolCache" 0 (makeRequestId())
+        "" |> request "enableSymbolCache" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let buildBackgroundSymbolCache () =
-        "" |> request "buildBackgroundSymbolCache" 0 (makeRequestId())
+        "" |> request "buildBackgroundSymbolCache" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let registerAnalyzer s =
         { ProjectRequest.FileName = s }
-        |> request "registerAnalyzer" 0 (makeRequestId())
+        |> request "registerAnalyzer" 0 (makeRequestId()) (failwithf "Not supported: %A")
 
     let private fsacConfig () =
         compilerLocation ()
